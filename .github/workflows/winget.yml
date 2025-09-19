@@ -33,17 +33,6 @@ jobs:
         id: check_plus
         shell: pwsh
         run: |
-          # On release event, always publish
-          if ("${{ github.event_name }}" -eq "release") {
-            "ready=true" >> $env:GITHUB_OUTPUT
-            exit 0
-          }
-          # On manual runs: check essential prerequisites
-          if (-not "${{ secrets.WINGET_TOKEN }}") {
-            Write-Warning "Missing WINGET_TOKEN; skipping Plus publish."
-            "ready=false" >> $env:GITHUB_OUTPUT
-            exit 0
-          }
           try {
             $resp = Invoke-RestMethod -Method GET -Uri "https://api.github.com/repos/sandboxie-plus/Sandboxie/releases/latest" -Headers @{ "Accept"="application/vnd.github+json" }
             $hasAsset = $false
@@ -57,8 +46,13 @@ jobs:
               "ready=false" >> $env:GITHUB_OUTPUT
             }
           } catch {
-            Write-Warning ("Could not inspect latest release: " + $_.Exception.Message + " ; skipping Plus publish.")
-            "ready=false" >> $env:GITHUB_OUTPUT
+            if ($_.Exception.Response.StatusCode.value__ -eq 404) {
+              Write-Warning "No latest release found (404), proceeding anyway."
+              "ready=true" >> $env:GITHUB_OUTPUT
+            } else {
+              Write-Warning ("Could not inspect latest release: " + $_.Exception.Message + " ; skipping Plus publish.")
+              "ready=false" >> $env:GITHUB_OUTPUT
+            }
           }
 
       - name: Publish Sandboxie-Plus
